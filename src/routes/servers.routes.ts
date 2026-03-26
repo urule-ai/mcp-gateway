@@ -2,6 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import type { ServerRegistry, RegisterServerRequest } from '../services/server-registry.js';
 import type { ToolCatalog } from '../services/tool-catalog.js';
 import { z } from 'zod';
+import { AuditLogger } from '@urule/events';
+
+const audit = new AuditLogger('mcp-gateway', (topic, data) => {
+  console.log(JSON.stringify({ audit: true, topic, ...data as Record<string, unknown> }));
+});
 
 // -- Zod Schemas ------------------------------------------------------
 
@@ -41,6 +46,13 @@ export async function serversRoutes(
       return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues });
     }
     const server = registry.register(parsed.data as RegisterServerRequest);
+
+    const user = (request as any).uruleUser;
+    audit.entityCreated(
+      { id: user?.id ?? 'anonymous', username: user?.username ?? 'anonymous' },
+      'mcp-server', server.id, `MCP server "${parsed.data.name}" registered`,
+    ).catch(() => {});
+
     reply.status(201).send(server);
   });
 
@@ -62,6 +74,13 @@ export async function serversRoutes(
       return;
     }
     catalog.removeServerTools(request.params.serverId);
+
+    const user = (request as any).uruleUser;
+    audit.entityDeleted(
+      { id: user?.id ?? 'anonymous', username: user?.username ?? 'anonymous' },
+      'mcp-server', request.params.serverId, `MCP server "${request.params.serverId}" removed`,
+    ).catch(() => {});
+
     reply.status(204).send();
   });
 
