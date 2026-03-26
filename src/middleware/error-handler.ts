@@ -1,6 +1,8 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 
 export function errorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
+  request.log.error({ err: error, requestId: request.id }, 'Request error');
+
   const statusCode = error.statusCode ?? 500;
 
   reply.status(statusCode).send({

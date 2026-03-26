@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, jsonb, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, jsonb, boolean, timestamp, index } from 'drizzle-orm/pg-core';
 
 export const mcpServers = pgTable('mcp_servers', {
   id: varchar('id', { length: 26 }).primaryKey(),
@@ -12,4 +12,6 @@ export const mcpServers = pgTable('mcp_servers', {
   verified: boolean('verified').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  nameIdx: index('mcp_servers_name_idx').on(table.name),
+}));

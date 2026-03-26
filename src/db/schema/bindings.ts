@@ -1,4 +1,4 @@
-import { pgTable, varchar, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, jsonb, timestamp, index } from 'drizzle-orm/pg-core';
 import { mcpServers } from './mcp-servers.js';
 
 export const workspaceBindings = pgTable('workspace_bindings', {
@@ -9,4 +9,6 @@ export const workspaceBindings = pgTable('workspace_bindings', {
   status: varchar('status', { length: 20 }).notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  workspaceIdIdx: index('workspace_bindings_workspace_id_idx').on(table.workspaceId),
+}));

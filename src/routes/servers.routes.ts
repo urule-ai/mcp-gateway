@@ -35,8 +35,11 @@ export async function serversRoutes(
   const { registry, catalog } = opts;
 
   // List all MCP servers
-  app.get('/api/v1/mcp/servers', async () => {
-    return registry.list();
+  app.get<{ Querystring: { limit?: string; offset?: string } }>('/api/v1/mcp/servers', async (request) => {
+    const limit = Math.min(parseInt(request.query.limit ?? '50', 10), 100);
+    const offset = parseInt(request.query.offset ?? '0', 10);
+    const all = registry.list();
+    return all.slice(offset, offset + limit);
   });
 
   // Register a new MCP server

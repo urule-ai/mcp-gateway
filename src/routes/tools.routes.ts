@@ -8,13 +8,16 @@ export async function toolsRoutes(
   const { catalog } = opts;
 
   // Search/list all tools
-  app.get<{ Querystring: { search?: string; serverId?: string } }>(
+  app.get<{ Querystring: { search?: string; serverId?: string; limit?: string; offset?: string } }>(
     '/api/v1/mcp/tools',
     async (request) => {
-      return catalog.listTools({
+      const limit = Math.min(parseInt(request.query.limit ?? '50', 10), 100);
+      const offset = parseInt(request.query.offset ?? '0', 10);
+      const all = catalog.listTools({
         search: request.query.search,
         serverId: request.query.serverId,
       });
+      return all.slice(offset, offset + limit);
     },
   );
 
