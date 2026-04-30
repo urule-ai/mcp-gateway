@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
+import { buildServer } from '../src/server.js';
 import { validateConfig, loadConfig } from '../src/config.js';
 
 describe('mcp-gateway — config validation', () => {
@@ -47,37 +46,68 @@ describe('mcp-gateway — config validation', () => {
   });
 });
 
-describe('mcp-gateway — CORS lockdown', () => {
-  async function buildCorsApp() {
-    const app = Fastify({ logger: false });
-    await app.register(cors, { origin: ['http://localhost:3000'] });
-    app.get('/healthz', async () => ({ status: 'ok' }));
-    return app;
+describe('mcp-gateway — CORS lockdown via real buildServer + CORS_ORIGINS env', () => {
+  // Exercises the actual server.ts wiring (env read, comma split, fastify-cors
+  // registration). Note: prior to the §1.3 expansion this service had NO CORS
+  // registration — the old stub-based tests were testing fastify-cors itself,
+  // not this service.
+  const FAKE_CONFIG = {
+    port: 0,
+    host: '127.0.0.1',
+    databaseUrl: 'postgres://fake:fake@127.0.0.1:1/fake',
+    natsUrl: 'nats://127.0.0.1:1',
+    serviceName: 'mcp-gateway-test',
+  };
+
+  async function buildAppWithCorsOrigins(origins: string | undefined) {
+    const orig = process.env['CORS_ORIGINS'];
+    if (origins === undefined) delete process.env['CORS_ORIGINS'];
+    else process.env['CORS_ORIGINS'] = origins;
+    try {
+      return await buildServer(FAKE_CONFIG);
+    } finally {
+      if (orig !== undefined) process.env['CORS_ORIGINS'] = orig;
+      else delete process.env['CORS_ORIGINS'];
+    }
   }
 
-  it('echoes Access-Control-Allow-Origin for an allow-listed origin', async () => {
-    const app = await buildCorsApp();
+  it('echoes Access-Control-Allow-Origin for the first allow-listed origin', async () => {
+    const app = await buildAppWithCorsOrigins('http://allowed.example,http://other.example');
     const res = await app.inject({
       method: 'OPTIONS',
       url: '/healthz',
-      headers: {
-        origin: 'http://localhost:3000',
-        'access-control-request-method': 'GET',
-      },
+      headers: { origin: 'http://allowed.example', 'access-control-request-method': 'GET' },
     });
-    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+    expect(res.headers['access-control-allow-origin']).toBe('http://allowed.example');
+  });
+
+  it('echoes Access-Control-Allow-Origin for the second comma-separated origin', async () => {
+    const app = await buildAppWithCorsOrigins('http://allowed.example,http://other.example');
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: '/healthz',
+      headers: { origin: 'http://other.example', 'access-control-request-method': 'GET' },
+    });
+    expect(res.headers['access-control-allow-origin']).toBe('http://other.example');
   });
 
   it('does not echo Access-Control-Allow-Origin for a non-allow-listed origin', async () => {
-    const app = await buildCorsApp();
+    const app = await buildAppWithCorsOrigins('http://allowed.example');
     const res = await app.inject({
       method: 'OPTIONS',
       url: '/healthz',
-      headers: {
-        origin: 'https://evil.example',
-        'access-control-request-method': 'GET',
-      },
+      headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' },
     });
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('falls back to http://localhost:3000 when CORS_ORIGINS is unset', async () => {
+    const app = await buildAppWithCorsOrigins(undefined);
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: '/healthz',
+      headers: { origin: 'http://localhost:3000', 'access-control-request-method': 'GET' },
+    });
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
   });
 });
