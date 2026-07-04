@@ -43,6 +43,27 @@ curl -X POST http://localhost:3000/api/v1/mcp/servers \
   }'
 ```
 
+### Register a remote Xquik MCP server
+
+Xquik exposes a remote Streamable HTTP MCP endpoint for X/Twitter search,
+extraction, monitoring, webhooks, and write workflows. Register it through a
+local stdio bridge so existing workspace bindings can consume it like any other
+server:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/mcp/servers \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "xquik",
+    "command": "mcp-stdio",
+    "args": ["https://xquik.com/mcp"],
+    "env": {
+      "MCP_BEARER_TOKEN": "YOUR_XQUIK_API_KEY"
+    },
+    "transportType": "stdio"
+  }'
+```
+
 ### Bind a server to a workspace
 
 ```bash
